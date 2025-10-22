@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Caballo Saltarín (Runner)</title>
+    <style>
+        /* =================== ESTILOS CSS =================== */
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(to bottom, #dff0ff, #b8e0f5);
+            font-family: monospace;
+            user-select: none;
+        }
+
+        #juego-contenedor {
+            width: 600px;
+            height: 150px;
+            border-bottom: 3px solid #333;
+            overflow: hidden;
+            position: relative;
+            background-color: #fff;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.15);
+            border-radius: 10px;
+        }
+
+        #caballo {
+            width: 40px;
+            height: 40px;
+            background-image: url('caballo.png');
+            background-size: cover;
+            position: absolute;
+            bottom: 0;
+            left: 50px;
+            z-index: 10;
+        }
+
+        .arbol {
+            width: 20px;
+            height: 40px;
+            background-image: url('arbol.png');
+            background-size: cover;
+            position: absolute;
+            bottom: 0;
+        }
+
+        #puntuacion {
+            position: absolute;
+            top: 8px;
+            right: 10px;
+            font-size: 1.1em;
+            color: #444;
+            z-index: 20;
+        }
+
+        #mejorPuntuacion {
+            position: absolute;
+            top: 8px;
+            left: 10px;
+            font-size: 1.1em;
+            color: #444;
+            z-index: 20;
+        }
+
+        .oculto {
+            display: none !important;
+        }
+
+        #mensaje-fin {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.4em;
+            color: #333;
+            text-align: center;
+            padding: 20px;
+            background-color: rgba(255, 255, 255, 0.95);
+            border: 2px solid #333;
+            border-radius: 10px;
+            z-index: 30;
+        }
+
+        #mensaje-fin button {
+            padding: 10px 20px;
+            font-size: 0.9em;
+            cursor: pointer;
+            margin-top: 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            transition: 0.2s;
+        }
+
+        #mensaje-fin button:hover {
+            background-color: #3e9142;
+        }
+        /* ================= END ESTILOS CSS ================= */
+    </style>
+</head>
+<body>
+
+    <div id="juego-contenedor">
+        <div id="caballo"></div>
+        <div id="puntuacion">Puntos: 0</div>
+        <div id="mejorPuntuacion">Mejor: 0</div>
+
+        <div id="mensaje-fin" class="oculto">
+            GAME OVER<br>
+            <span id="puntuacion-final"></span><br>
+            <span id="mejor-final"></span><br>
+            <button onclick="reiniciarJuego()">REINTENTAR</button>
+        </div>
+    </div>
+
+    <!-- ======== SONIDOS ======== -->
+    <audio id="sonido-salto" src="salto.mp3"></audio>
+    <audio id="sonido-gameover" src="gameover.mp3"></audio>
+
+
+<script>
+    // ================== VARIABLES ==================
+    const caballo = document.getElementById('caballo');
+    const contenedor = document.getElementById('juego-contenedor');
+    const mensajeFin = document.getElementById('mensaje-fin');
+    const puntuacionDisplay = document.getElementById('puntuacion');
+    const mejorDisplay = document.getElementById('mejorPuntuacion');
+    const sonidoSalto = document.getElementById('sonido-salto');
+    const sonidoGameOver = document.getElementById('sonido-gameover');
+
+    let estaSaltando = false;
+    let juegoActivo = true;
+    let puntuacion = 0;
+    
+    // 🚀 VARIABLES DE PROGRESIÓN Y DIFICULTAD
+    let velocidadArbol = 2.5;     
+    const ACELERACION = 0.05;    
+    const MAX_VELOCIDAD = 12;     
+    
+    // 🐴 AJUSTE CLAVE PARA SALTO MÁS FLUIDO
+    let gravedad = 0.4; // ⬅️ Reducida de 0.7 a 0.5 (El salto será más alto y lento/fluido)
+    const VELOCIDAD_SALTO_INICIAL = 10; // ⬅️ Aumentada de 11 a 12
+    const TIEMPO_BASE_APARICION = 5500; // ⬅️ Reducido de 15000 a 7500 (Los árboles aparecen el doble de rápido)
+    
+    let intervaloPuntuacion;
+    let timeoutGeneracionArboles; 
+    let mejorPuntuacion = localStorage.getItem('mejorPuntuacion') || 0;
+    mejorDisplay.textContent = 'Mejor: ' + mejorPuntuacion;
+
+    // ================== SALTO ==================
+    function saltar() {
+        if (!estaSaltando && juegoActivo) {
+            estaSaltando = true;
+            sonidoSalto.play();
+
+            let velocidadVertical = VELOCIDAD_SALTO_INICIAL;
+            let posicion = 0;
+
+            const saltoAnimacion = () => {
+                if (!juegoActivo) return;
+
+                posicion += velocidadVertical;
+                velocidadVertical -= gravedad; // ⬅️ Gravedad más suave
+
+                if (posicion <= 0) {
+                    posicion = 0;
+                    estaSaltando = false;
+                }
+
+                caballo.style.bottom = posicion + 'px';
+                if (estaSaltando || posicion > 0) {
+                    requestAnimationFrame(saltoAnimacion);
+                }
+            };
+
+            requestAnimationFrame(saltoAnimacion);
+        }
+    }
+
+    document.addEventListener('keydown', (event) => {
+        if (event.code === 'Space' || event.code === 'ArrowUp') {
+            event.preventDefault();
+            saltar();
+        }
+    });
+
+    // ================== OBSTÁCULOS ==================
+    function generarArbol() {
+        const arbol = document.createElement('div');
+        arbol.classList.add('arbol');
+        contenedor.appendChild(arbol);
+
+        let posicionArbolLeft = 600;
+        const arbolWidth = 20;
+        const arbolHeight = 40;
+
+        function moverArbol() {
+            if (!juegoActivo) {
+                arbol.remove();
+                return;
+            }
+
+            posicionArbolLeft -= velocidadArbol; 
+            arbol.style.left = posicionArbolLeft + 'px';
+
+            const caballoPosBottom = parseInt(caballo.style.bottom) || 0;
+            const caballoPosLeft = 50;
+            const caballoWidth = 40;
+
+            const colisionX =
+                caballoPosLeft + caballoWidth > posicionArbolLeft &&
+                caballoPosLeft < posicionArbolLeft + arbolWidth;
+            const colisionY = caballoPosBottom < arbolHeight;
+
+            if (colisionX && colisionY) {
+                juegoActivo = false;
+                finJuego();
+                return;
+            }
+
+            if (posicionArbolLeft <= -arbolWidth) {
+                arbol.remove();
+                return;
+            }
+
+            requestAnimationFrame(moverArbol);
+        }
+
+        requestAnimationFrame(moverArbol);
+    }
+
+    function iniciarGeneracionArboles() {
+        // 🌳 Usa la nueva constante más baja para que los árboles aparezcan antes
+        const tiempoBase = TIEMPO_BASE_APARICION / velocidadArbol; 
+        const tiempoEspera = tiempoBase + Math.random() * 500; 
+
+        timeoutGeneracionArboles = setTimeout(() => {
+            if (juegoActivo) {
+                generarArbol();
+                iniciarGeneracionArboles(); 
+            }
+        }, tiempoEspera);
+    }
+
+    // ================== PUNTUACIÓN ==================
+    function actualizarPuntuacion() {
+        if (juegoActivo) {
+            puntuacion++;
+            puntuacionDisplay.textContent = 'Puntos: ' + puntuacion;
+
+            // 🚀 Aceleración constante del juego
+            if (velocidadArbol < MAX_VELOCIDAD) {
+                velocidadArbol += ACELERACION;
+            }
+        }
+    }
+
+    // ================== GAME OVER ==================
+    function finJuego() {
+        sonidoGameOver.play();
+        clearInterval(intervaloPuntuacion);
+        clearTimeout(timeoutGeneracionArboles); 
+
+        if (puntuacion > mejorPuntuacion) {
+            mejorPuntuacion = puntuacion;
+            localStorage.setItem('mejorPuntuacion', mejorPuntuacion);
+        }
+
+        mensajeFin.classList.remove('oculto');
+        document.getElementById('puntuacion-final').textContent = 'Puntuación final: ' + puntuacion;
+        document.getElementById('mejor-final').textContent = 'Mejor puntuación: ' + mejorPuntuacion;
+        mejorDisplay.textContent = 'Mejor: ' + mejorPuntuacion;
+    }
+
+    // ================== REINICIAR ==================
+    function reiniciarJuego() {
+        juegoActivo = true;
+        estaSaltando = false;
+        puntuacion = 0;
+        velocidadArbol = 2.5; // Reinicia la velocidad
+        caballo.style.bottom = '0px';
+        puntuacionDisplay.textContent = 'Puntos: 0';
+        mensajeFin.classList.add('oculto');
+
+        document.querySelectorAll('.arbol').forEach(a => a.remove());
+
+        iniciarJuego();
+    }
+
+    // ================== INICIO ==================
+    function iniciarJuego() {
+        intervaloPuntuacion = setInterval(actualizarPuntuacion, 100); 
+        iniciarGeneracionArboles(); 
+    }
+
+    iniciarJuego();
+</script>
+</body>
+</html>
