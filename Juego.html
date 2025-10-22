@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
     <title>Caballo Saltarín (Runner)</title>
     <style>
         /* =================== ESTILOS CSS =================== */
@@ -13,7 +14,10 @@
             margin: 0;
             background: linear-gradient(to bottom, #dff0ff, #b8e0f5);
             font-family: monospace;
-            user-select: none;
+            /* Previene la selección de texto al tocar */
+            user-select: none; 
+            /* Previene el zoom al tocar rápido */
+            touch-action: manipulation; 
         }
 
         #juego-contenedor {
@@ -26,11 +30,20 @@
             box-shadow: 0 0 15px rgba(0, 0, 0, 0.15);
             border-radius: 10px;
         }
+        
+        /* Media Query para mejor visualización en pantallas pequeñas */
+        @media (max-width: 650px) {
+            #juego-contenedor {
+                width: 90vw; 
+                height: 120px;
+            }
+        }
 
         #caballo {
             width: 40px;
             height: 40px;
-            background-image: url('caballo.png');
+            /* Verifica que 'caballo.png' exista */
+            background-image: url('caballo.png'); 
             background-size: cover;
             position: absolute;
             bottom: 0;
@@ -41,7 +54,8 @@
         .arbol {
             width: 20px;
             height: 40px;
-            background-image: url('arbol.png');
+            /* Verifica que 'arbol.png' exista */
+            background-image: url('arbol.png'); 
             background-size: cover;
             position: absolute;
             bottom: 0;
@@ -117,7 +131,6 @@
         </div>
     </div>
 
-    <!-- ======== SONIDOS ======== -->
     <audio id="sonido-salto" src="salto.mp3"></audio>
     <audio id="sonido-gameover" src="gameover.mp3"></audio>
 
@@ -137,14 +150,14 @@
     let puntuacion = 0;
     
     // 🚀 VARIABLES DE PROGRESIÓN Y DIFICULTAD
-    let velocidadArbol = 2.5;     
-    const ACELERACION = 0.05;    
-    const MAX_VELOCIDAD = 12;     
+    let velocidadArbol = 2.5;     
+    const ACELERACION = 0.05;    
+    const MAX_VELOCIDAD = 12;     
     
     // 🐴 AJUSTE CLAVE PARA SALTO MÁS FLUIDO
-    let gravedad = 0.4; // ⬅️ Reducida de 0.7 a 0.5 (El salto será más alto y lento/fluido)
-    const VELOCIDAD_SALTO_INICIAL = 10; // ⬅️ Aumentada de 11 a 12
-    const TIEMPO_BASE_APARICION = 5500; // ⬅️ Reducido de 15000 a 7500 (Los árboles aparecen el doble de rápido)
+    let gravedad = 0.4; 
+    const VELOCIDAD_SALTO_INICIAL = 10; 
+    const TIEMPO_BASE_APARICION = 5500; 
     
     let intervaloPuntuacion;
     let timeoutGeneracionArboles; 
@@ -155,7 +168,15 @@
     function saltar() {
         if (!estaSaltando && juegoActivo) {
             estaSaltando = true;
-            sonidoSalto.play();
+            sonidoSalto.currentTime = 0; 
+            // Manejo de promesa para evitar errores de reproducción en algunos móviles
+            const playPromise = sonidoSalto.play(); 
+            if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                    // console.log("Fallo al reproducir sonido de salto: ", error);
+                });
+            }
+
 
             let velocidadVertical = VELOCIDAD_SALTO_INICIAL;
             let posicion = 0;
@@ -164,7 +185,7 @@
                 if (!juegoActivo) return;
 
                 posicion += velocidadVertical;
-                velocidadVertical -= gravedad; // ⬅️ Gravedad más suave
+                velocidadVertical -= gravedad; 
 
                 if (posicion <= 0) {
                     posicion = 0;
@@ -180,7 +201,10 @@
             requestAnimationFrame(saltoAnimacion);
         }
     }
+    
+    // ================== CONTROL DE EVENTOS MEJORADO ==================
 
+    // ⌨️ CONTROL DE TECLADO (Para escritorio)
     document.addEventListener('keydown', (event) => {
         if (event.code === 'Space' || event.code === 'ArrowUp') {
             event.preventDefault();
@@ -188,13 +212,32 @@
         }
     });
 
-    // ================== OBSTÁCULOS ==================
+    // 🌟 CONTROL TÁCTIL (Móviles) 🌟
+    // Usamos 'touchstart' que es más rápido que 'click' en dispositivos móviles.
+    contenedor.addEventListener('touchstart', (event) => {
+        // Solo salta si el juego está activo y NO se tocó el botón de "REINTENTAR"
+        if (juegoActivo && event.target.tagName !== 'BUTTON') { 
+            event.preventDefault(); // Previene el zoom o scroll accidental
+            saltar();
+        }
+    });
+    
+    // Fallback de click para algunos navegadores
+    contenedor.addEventListener('click', (event) => {
+        if (juegoActivo && event.target.tagName !== 'BUTTON') {
+             saltar();
+        }
+    });
+
+
+    // ================== LÓGICA DEL JUEGO (Sin Cambios Relevantes) ==================
+
     function generarArbol() {
         const arbol = document.createElement('div');
         arbol.classList.add('arbol');
         contenedor.appendChild(arbol);
 
-        let posicionArbolLeft = 600;
+        let posicionArbolLeft = contenedor.offsetWidth; 
         const arbolWidth = 20;
         const arbolHeight = 40;
 
@@ -234,7 +277,6 @@
     }
 
     function iniciarGeneracionArboles() {
-        // 🌳 Usa la nueva constante más baja para que los árboles aparezcan antes
         const tiempoBase = TIEMPO_BASE_APARICION / velocidadArbol; 
         const tiempoEspera = tiempoBase + Math.random() * 500; 
 
@@ -246,22 +288,27 @@
         }, tiempoEspera);
     }
 
-    // ================== PUNTUACIÓN ==================
     function actualizarPuntuacion() {
         if (juegoActivo) {
             puntuacion++;
             puntuacionDisplay.textContent = 'Puntos: ' + puntuacion;
 
-            // 🚀 Aceleración constante del juego
             if (velocidadArbol < MAX_VELOCIDAD) {
                 velocidadArbol += ACELERACION;
             }
         }
     }
 
-    // ================== GAME OVER ==================
     function finJuego() {
-        sonidoGameOver.play();
+        sonidoGameOver.currentTime = 0;
+        // Manejo de promesa para evitar errores de reproducción
+        const playPromise = sonidoGameOver.play(); 
+        if (playPromise !== undefined) {
+            playPromise.catch(error => {
+                // console.log("Fallo al reproducir sonido de gameover: ", error);
+            });
+        }
+        
         clearInterval(intervaloPuntuacion);
         clearTimeout(timeoutGeneracionArboles); 
 
@@ -276,12 +323,11 @@
         mejorDisplay.textContent = 'Mejor: ' + mejorPuntuacion;
     }
 
-    // ================== REINICIAR ==================
     function reiniciarJuego() {
         juegoActivo = true;
         estaSaltando = false;
         puntuacion = 0;
-        velocidadArbol = 2.5; // Reinicia la velocidad
+        velocidadArbol = 2.5; 
         caballo.style.bottom = '0px';
         puntuacionDisplay.textContent = 'Puntos: 0';
         mensajeFin.classList.add('oculto');
@@ -291,7 +337,6 @@
         iniciarJuego();
     }
 
-    // ================== INICIO ==================
     function iniciarJuego() {
         intervaloPuntuacion = setInterval(actualizarPuntuacion, 100); 
         iniciarGeneracionArboles(); 
